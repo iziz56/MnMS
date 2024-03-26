@@ -58,6 +58,12 @@ uber.attach_vehicle_observer(CSVVehicleObserver('uber_vehs.csv'))
 rh_layer = generate_layer_from_roads(roads, 'RH', mobility_services=[uber])
 uber.create_waiting_vehicle('RH_3')
 uber.create_waiting_vehicle('RH_2')
+uber.create_waiting_vehicle('RH_2')
+uber.create_waiting_vehicle('RH_2')
+uber.create_waiting_vehicle('RH_2')
+uber.create_waiting_vehicle('RH_2')
+
+
 
 
 bus_service = PublicTransportMobilityService('BUS')
@@ -74,10 +80,10 @@ mlgraph = MultiLayerGraph([car_layer, rh_layer, bus_layer],odlayer,1)
 # mlgraph = MultiLayerGraph([car_layer,rh_layer],odlayer,1)
 
 
-demand = BaseDemandManager([User("U0", [0, 1000], [1000, 0], Time("07:00:00")),
-                            User("U1", [0, 1000], [1000, 0], Time("07:05:00")),
-                            User("U2", [0, 1000], [1000, 0], Time("07:05:00")),
-                            User("U3", [0, 1000], [1000, 0], Time("07:20:00"))])
+demand = BaseDemandManager([User("U0", [0, 1000], [1000, 0], Time("07:00:00"),['UBER']),
+                            User("U1", [0, 1000], [1000, 0], Time("07:05:00"),['UBER']),
+                            User("U2", [0, 1000], [1000, 0], Time("07:05:00"),['UBER']),
+                            User("U3", [0, 1000], [1000, 0], Time("07:20:00"),['UBER'])])
 demand.add_user_observer(CSVUserObserver('users.csv'))
 
 
@@ -92,7 +98,7 @@ def dynamic(graph, tcurrent):
     if all(flag == 0 for flag in flags):
         return []  # No active period
     elif all(flag == 1 for flag in flags):
-        return [("RH_5_5b", "UBER", 30)]  # Always active period
+        return [("RH_5_5b", "UBER", 29)]  # Always active period
 
 
     # Iterate through the time slots and flags for normal cases
@@ -106,22 +112,22 @@ def dynamic(graph, tcurrent):
                 end_time = Time("23:59:59")  # Extend last period to end of day
             # Check if tcurrent is within the active period
             if start_time <= tcurrent < end_time:
-                return [("RH_5_5b", "UBER", 30)] # try to banning the connection
+                return [("RH_5_5b", "UBER", 29)] # try to banning the connection
 
 
     # If tcurrent does not match any active periods
     return []
 
-# def dynamic_(graph, tcurrent):
-#     if tcurrent >= Time('07:05:30') and tcurrent < Time('07:05:40'):
-#         return [("RH_5_5b", "UBER", 3)]
-#     return []
+def dynamic_(graph, tcurrent):
+    if tcurrent >= Time('07:05:30') and tcurrent < Time('07:05:40'):
+        return [("RH_5_5b", "UBER", 1)]
+    return []
 
-mlgraph.dynamic_space_sharing.set_dynamic(dynamic, 0)
+mlgraph.dynamic_space_sharing.set_dynamic(dynamic_, 0)
 
 
 def mfdspeed_RES(dacc):
-    if dacc['CAR'] >=1:
+    if dacc['CAR'] >1:
         dspeed = {'CAR': 2}
     else:
         dspeed = {'CAR': 5}
