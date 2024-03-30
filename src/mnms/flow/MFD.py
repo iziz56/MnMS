@@ -10,6 +10,7 @@ from hipop.graph import Link
 
 from mnms.demand import User
 from mnms.flow.abstract import AbstractMFDFlowMotor, AbstractReservoir
+from mnms.flow.LCF import LCF, Network_Length
 from mnms.graph.zone import Zone
 from mnms.log import create_logger
 from mnms.time import Dt, Time
@@ -173,9 +174,19 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
 
             Returns
         """
-
-        dist_travelled = dt*speed
-
+        veh_zone = self.get_vehicle_zone(veh)
+        #################### edit speed function based on the LCF #####################
+        if veh_zone =='RES':
+            unode, dnode = veh.current_link
+            curr_link = self.graph_nodes[unode].adj[dnode]
+            lid = self._graph.map_reference_links[curr_link.id][0]  # take reservoir of first part of trip
+            temp_speed = LCF(speed)[lid]         
+            dist_travelled = dt*temp_speed   
+        else: 
+            dist_travelled = dt*speed 
+        
+        #################### Re-calculate the distance travelled #####################
+        #################### TODO: try to get the exact distance travelled #####################
         if dist_travelled > veh.remaining_link_length:
             dist_travelled = veh.remaining_link_length
             elapsed_time = dist_travelled / speed
@@ -202,6 +213,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             for passenger_id, passenger in veh.passengers.items():
                 passenger.set_position(veh._current_link, veh._current_node, veh.remaining_link_length, veh.position, tcurrent)
             return dt
+
 
     def get_vehicle_zone(self, veh):
         try:
@@ -310,8 +322,16 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             for section, length in link_info.sections:
                 res_id = self._section_to_reservoir[section]
                 res = self.reservoirs[res_id]
-                speed = res.dict_speeds[link_info.veh]
+                avg_speed = res.dict_speeds[link_info.veh]
+
+                #################### function edit #####################
+                if res_id =='RES':
+                    speed = LCF(avg_speed)[section]         
+                else: 
+                    speed = avg_speed
+
                 total_len += length
+                
                 if speed is not None:
                     new_speed += length * speed
                 else:
