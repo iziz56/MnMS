@@ -10,7 +10,7 @@ from hipop.graph import Link
 
 from mnms.demand import User
 from mnms.flow.abstract import AbstractMFDFlowMotor, AbstractReservoir
-from mnms.flow.LCF import LCF, Network_Length
+from mnms.flow.LCF import LCF, LCF_bus, Network_Length,banning_check
 from mnms.graph.zone import Zone
 from mnms.log import create_logger
 from mnms.time import Dt, Time
@@ -167,7 +167,9 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
             travelled = 0
         veh.set_position(unode_pos+normalized_direction*travelled)
 
-    def move_veh(self, veh: Vehicle, tcurrent: Time, dt: float, speed: float) -> float:
+
+
+    def move_veh(self, time_slots, flags, veh: Vehicle, tcurrent: Time, dt: float, speed: float) -> float:
         """Move a vehicle
 
             Parameters
@@ -177,14 +179,25 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
         veh_zone = self.get_vehicle_zone(veh)
         #################### edit speed function based on the LCF #####################
         if veh_zone =='RES':
-            unode, dnode = veh.current_link
-            curr_link = self.graph_nodes[unode].adj[dnode]
-            lid = self._graph.map_reference_links[curr_link.id][0]  # take reservoir of first part of trip
-            temp_speed = LCF(speed)[lid]         
-            dist_travelled = dt*temp_speed   
+            unode, dnode        = veh.current_link
+            curr_link           = self.graph_nodes[unode].adj[dnode]
+            lid                 = self._graph.map_reference_links[curr_link.id][0]  # take reservoir of first part of trip
+            temp_speed          = speed
+            # temp_speed          = LCF(speed)[lid]         
+            dist_travelled      = dt*temp_speed   
         else: 
-            dist_travelled = dt*speed 
-        
+            if banning_check(tcurrent,time_slots,flags):
+                temp_speed      = speed
+                dist_travelled  = dt*temp_speed   
+            else: 
+                bus_accum       = self.dict_accumulations['Res_bus']['BUS']
+                temp_speed      = speed 
+                # temp_speed      = LCF_bus(bus_accum,speed)   
+                dist_travelled  = dt*temp_speed   
+
+    
+
+
         #################### Re-calculate the distance travelled #####################
         #################### TODO: try to get the exact distance travelled #####################
         if dist_travelled > veh.remaining_link_length:
@@ -231,7 +244,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
 
         return res_id
 
-    def step(self, dt: Dt):
+    def step(self, timeslot, flags, dt: Dt):
 
         log.info(f'MFD step {self._tcurrent}')
 
@@ -271,7 +284,7 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                 res_id = self.get_vehicle_zone(veh)
                 speed = self.dict_speeds[res_id][veh_type]
                 veh.speed = speed
-                elapsed_time = self.move_veh(veh, self._tcurrent, veh_dt, speed)
+                elapsed_time = self.move_veh(timeslot, flags, veh, self._tcurrent, veh_dt, speed)
                 next_res_id = self.get_vehicle_zone(veh)
                 if next_res_id != res_id:
                     # Vehicle exited the reservoir, register a new trip length in the left reservoir
@@ -323,13 +336,14 @@ class MFDFlowMotor(AbstractMFDFlowMotor):
                 res_id = self._section_to_reservoir[section]
                 res = self.reservoirs[res_id]
                 avg_speed = res.dict_speeds[link_info.veh]
-
                 #################### function edit #####################
                 if res_id =='RES':
-                    speed = LCF(avg_speed)[section]         
+                    # speed = LCF(avg_speed)[section]
+                    speed = avg_speed         
                 else: 
+                    bus_accum = self.dict_accumulations[res_id]['BUS']
+                    # speed = LCF_bus(bus_accum,avg_speed)
                     speed = avg_speed
-
                 total_len += length
                 
                 if speed is not None:

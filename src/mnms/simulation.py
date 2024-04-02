@@ -26,6 +26,8 @@ log = create_logger(__name__)
 
 class Supervisor(object):
     def __init__(self,
+                 timeslot,
+                 flags,
                  graph: MultiLayerGraph,
                  demand: AbstractDemandManager,
                  flow_motor: AbstractMFDFlowMotor,
@@ -36,9 +38,11 @@ class Supervisor(object):
         """
         Main class to launch a simulation.
 
-        Args:
-            -graph: The multi layer graph
-            -demand: The demand manager
+        Args:   
+            -timeslot:  banning time slot 
+            =flags:     banning flags
+            -graph:     The multi layer graph
+            -demand:    The demand manager
             -flow_motor: The flow motor
             -decision_model: The decision model
             -outfile: If not None write in the outfile at each time step the cost
@@ -46,7 +50,8 @@ class Supervisor(object):
             -logfile: file where simulation log should be printed
             -loglevel: level of log to print
         """
-
+        self._timeslot  = timeslot
+        self._flags     = flags
         self._mlgraph: MultiLayerGraph = None
         self._demand: AbstractDemandManager = demand
         self._flow_motor: AbstractMFDFlowMotor = flow_motor
@@ -239,7 +244,7 @@ class Supervisor(object):
         """
         log.info(' Launch flow motor step...')
         start = time()
-        self._flow_motor.step(flow_dt)
+        self._flow_motor.step(self._timeslot,self._flags, flow_dt) # edit
         self._flow_motor.update_time(flow_dt)
         end = time()
         log.info(f' Flow motor step done in [{end - start:.5} s]')
